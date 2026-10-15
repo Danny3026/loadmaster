@@ -1,0 +1,1 @@
+import{t as e}from"./client-bLrIbxMr.js";var t={getUsers:async t=>(await e.get(`/users`,{params:t})).data,getUserById:async t=>(await e.get(`/users/${t}`)).data,createUser:async t=>(await e.post(`/users`,t)).data,updateUser:async(t,n)=>(await e.patch(`/users/${t}`,n)).data,deleteUser:async t=>(await e.delete(`/users/${t}`)).data};export{t};

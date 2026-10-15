@@ -1,0 +1,1 @@
+# This project has no Python runtime dependencies; the backend uses Node.js.

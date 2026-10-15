@@ -1,0 +1,88 @@
+:root {
+  --company-brand-color: #2563eb;
+}
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-slate-50 text-slate-900;
+  }
+}
+
+@layer utilities {
+  .brand-primary-bg {
+    background-color: var(--company-brand-color, #2563eb);
+  }
+
+  .brand-primary-soft-bg {
+    background-color: color-mix(in srgb, var(--company-brand-color, #2563eb) 10%, transparent);
+  }
+
+  .brand-primary-text {
+    color: var(--company-brand-color, #2563eb);
+  }
+
+  .brand-primary-border {
+    border-color: var(--company-brand-color, #2563eb);
+  }
+
+  .brand-button:hover {
+    filter: brightness(0.9);
+  }
+
+  .brand-button:active {
+    filter: brightness(0.8);
+  }
+}
+
+@layer utilities {
+  .glass {
+    @apply bg-white/70 backdrop-blur-md border border-white/20 shadow-sm;
+  }
+
+  .glass-dark {
+    @apply bg-slate-900/80 backdrop-blur-md border border-slate-700/50;
+  }
+  
+  /* Custom Scrollbar */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    @apply bg-slate-300 rounded-full;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-slate-400;
+  }
+  .dark ::-webkit-scrollbar-thumb {
+    @apply bg-slate-700;
+  }
+  
+  .focus-ring {
+    @apply focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 focus:ring-offset-1;
+  }
+}
+
+@keyframes notification-bell-pulse {
+  0% { transform: scale(1); }
+  35% { transform: scale(1.12); }
+  70% { transform: scale(0.98); }
+  100% { transform: scale(1); }
+}
+
+.notification-bell-pulse {
+  animation: notification-bell-pulse 850ms ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .notification-bell-pulse {
+    animation: none;
+  }
+}

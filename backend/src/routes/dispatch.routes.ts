@@ -1,0 +1,19 @@
+import { Router } from 'express';
+import * as dispatchController from '../controllers/dispatch.controller';
+import { validate } from '../middleware/validator';
+import { assignSchema, statusUpdateSchema } from '../validators/dispatch.validator';
+import { requireAuth } from '../middleware/auth';
+import { requireTenant } from '../middleware/tenant';
+import { requireRole } from '../middleware/rbac';
+import { Role } from '../types';
+
+const router = Router();
+
+router.use(requireAuth, requireTenant);
+
+router.post('/loads/:id/assign', requireRole(Role.ADMIN, Role.DISPATCHER), validate(assignSchema), dispatchController.assign);
+router.post('/loads/:id/dispatch', requireRole(Role.ADMIN, Role.DISPATCHER), dispatchController.dispatch);
+router.post('/loads/:id/unassign', requireRole(Role.ADMIN, Role.DISPATCHER), dispatchController.unassign);
+router.patch('/loads/:id/status', validate(statusUpdateSchema), dispatchController.updateStatus);
+
+export default router;

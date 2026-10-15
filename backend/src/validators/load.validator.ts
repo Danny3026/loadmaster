@@ -1,0 +1,58 @@
+import { z } from 'zod';
+import { LOAD_TYPES } from '../constants/load-types';
+
+const stopSchema = z.object({
+  stop_sequence: z.number().int().min(1),
+  stop_type: z.enum(['PICKUP', 'DELIVERY']),
+  facility_name: z.string().min(1),
+  address_line1: z.string().optional(),
+  address_line2: z.string().optional(),
+  city: z.string().min(1),
+  state: z.string().length(2),
+  zip_code: z.string().optional(),
+  appointment_date: z.string().optional(),
+  appointment_start: z.string().optional(),
+  appointment_end: z.string().optional(),
+  contact_name: z.string().optional(),
+  contact_phone: z.string().optional(),
+  instructions: z.string().optional(),
+});
+
+export const createLoadSchema = z.object({
+  body: z.object({
+    broker_id: z.string().uuid().optional(),
+    broker_name: z.string().optional(),
+    broker_mc: z.string().optional(),
+    broker_mc_confirmed_missing: z.boolean().optional(),
+    load_number: z.string().optional(),
+    broker_reference: z.string().optional(),
+    commodity: z.string().optional(),
+    weight: z.number().positive().optional(),
+    weight_unit: z.enum(['LBS', 'KGS']).optional(),
+    rate: z.number().nonnegative(),
+    loaded_miles: z.number().nonnegative().nullable().optional(),
+    deadhead_miles: z.number().nonnegative().default(0),
+    currency: z.string().default('USD'),
+    equipment_type: z.enum(LOAD_TYPES).optional(),
+    equipment_type_raw: z.string().optional(),
+    special_instructions: z.string().optional(),
+    stops: z.array(stopSchema).min(2),
+  }),
+});
+
+export const updateLoadSchema = z.object({
+  body: z.object({
+    broker_reference: z.string().optional(),
+    commodity: z.string().optional(),
+    weight: z.number().positive().optional(),
+    weight_unit: z.enum(['LBS', 'KGS']).optional(),
+    rate: z.number().nonnegative().optional(),
+    loaded_miles: z.number().nonnegative().optional(),
+    deadhead_miles: z.number().nonnegative().optional(),
+    equipment_type: z.enum(LOAD_TYPES).optional(),
+    equipment_type_raw: z.string().optional(),
+    special_instructions: z.string().optional(),
+    driver_id: z.string().uuid().optional(),
+    override_availability_conflict: z.boolean().optional(),
+  }),
+});

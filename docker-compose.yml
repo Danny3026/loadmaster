@@ -1,0 +1,37 @@
+version: '3.8'
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: loadmaster
+      POSTGRES_USER: loadmaster
+      POSTGRES_PASSWORD: loadmaster_dev
+    ports:
+      - '5432:5432'
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+  backend:
+    build: ./backend
+    ports:
+      - '3001:3001'
+    environment:
+      - NODE_ENV=development
+      - DATABASE_URL=postgresql://loadmaster:loadmaster_dev@postgres:5432/loadmaster
+      - JWT_SECRET=dev-secret-change-in-production-loadmaster-2024
+      - JWT_REFRESH_SECRET=dev-refresh-secret-change-in-production
+      - PORT=3001
+    depends_on:
+      - postgres
+    volumes:
+      - ./backend/src:/app/src
+      - ./storage:/app/storage
+  frontend:
+    build: ./frontend
+    ports:
+      - '5173:5173'
+    depends_on:
+      - backend
+    volumes:
+      - ./frontend/src:/app/src
+volumes:
+  pgdata:

@@ -1,0 +1,1 @@
+import{t as e}from"./useQuery-DRZcoand.js";import"./index-BVQ1g5l1.js";import{t}from"./drivers-Bz_xbYTx.js";var n=n=>e({queryKey:[`drivers`,n],queryFn:()=>t.getDrivers(n)}),r=()=>e({queryKey:[`driver`,`me`],queryFn:()=>t.getMe()});export{r as n,n as t};

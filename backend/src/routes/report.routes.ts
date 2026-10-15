@@ -1,0 +1,18 @@
+import { Router } from 'express';
+import * as reportController from '../controllers/report.controller';
+import { requireAuth } from '../middleware/auth';
+import { requireTenant } from '../middleware/tenant';
+import { requireRole } from '../middleware/rbac';
+import { Role } from '../types';
+
+const router = Router();
+
+router.use(requireAuth, requireTenant);
+router.use(requireRole(Role.ADMIN));
+
+router.get('/loads', reportController.getLoadsReport);
+router.get('/revenue', reportController.getRevenueReport);
+router.get('/drivers', reportController.getDriversReport);
+router.get('/missing-documents', reportController.getMissingDocuments);
+
+export default router;

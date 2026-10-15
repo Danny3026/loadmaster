@@ -1,0 +1,26 @@
+import { Router } from 'express';
+import * as settlementController from '../controllers/settlement.controller';
+import { requireAuth } from '../middleware/auth';
+import { requireTenant } from '../middleware/tenant';
+import { requireRole } from '../middleware/rbac';
+import { Role } from '../types';
+
+const router = Router();
+
+router.use(requireAuth, requireTenant);
+
+router.get('/', settlementController.getAll);
+router.get('/reconcile', requireRole(Role.ADMIN, Role.DISPATCHER), settlementController.reconcile);
+router.get('/mine', requireRole(Role.DRIVER), settlementController.getMine);
+router.post('/', requireRole(Role.ADMIN, Role.DISPATCHER), settlementController.create);
+router.get('/recurring-deductions', requireRole(Role.ADMIN, Role.DISPATCHER), settlementController.getRecurringDeductions);
+router.post('/recurring-deductions', requireRole(Role.ADMIN, Role.DISPATCHER), settlementController.createRecurringDeduction);
+router.patch('/recurring-deductions/:id', requireRole(Role.ADMIN, Role.DISPATCHER), settlementController.updateRecurringDeduction);
+router.delete('/recurring-deductions/:id', requireRole(Role.ADMIN, Role.DISPATCHER), settlementController.deleteRecurringDeduction);
+router.get('/:id', settlementController.getById);
+router.get('/:id/adjustments', requireRole(Role.ADMIN, Role.DISPATCHER), settlementController.getAdjustments);
+router.post('/:id/adjustments', requireRole(Role.ADMIN, Role.DISPATCHER), settlementController.addAdjustment);
+router.patch('/:id/status', requireRole(Role.ADMIN, Role.DISPATCHER), settlementController.updateStatus);
+router.post('/:id/mark-paid', requireRole(Role.ADMIN, Role.DISPATCHER), settlementController.markPaid);
+
+export default router;

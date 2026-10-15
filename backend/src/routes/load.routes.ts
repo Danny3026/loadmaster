@@ -1,0 +1,33 @@
+import { Router } from 'express';
+import * as loadController from '../controllers/load.controller';
+import * as documentController from '../controllers/document.controller';
+import * as aiController from '../controllers/ai.controller';
+import { validate } from '../middleware/validator';
+import { createLoadSchema, updateLoadSchema } from '../validators/load.validator';
+import { loadFilterSchema } from '../validators/query.validator';
+import { requireAuth } from '../middleware/auth';
+import { requireTenant } from '../middleware/tenant';
+import { requireRole } from '../middleware/rbac';
+import upload from '../middleware/upload';
+import { uploadDocumentSchema } from '../validators/document.validator';
+import { Role } from '../types';
+
+const router = Router();
+
+router.use(requireAuth, requireTenant);
+
+router.get('/', validate(loadFilterSchema), loadController.getAll);
+router.get('/:id', loadController.getById);
+router.post('/extract-pdf', requireRole(Role.ADMIN, Role.DISPATCHER), aiController.extractLoadDetails);
+router.post('/', requireRole(Role.ADMIN, Role.DISPATCHER), validate(createLoadSchema), loadController.create);
+router.patch('/:id', requireRole(Role.ADMIN, Role.DISPATCHER), validate(updateLoadSchema), loadController.update);
+router.delete('/:id', requireRole(Role.ADMIN), loadController.deleteLoad);
+
+router.get('/:id/status-history', loadController.getStatusHistory);
+router.post('/:id/archive', requireRole(Role.ADMIN, Role.DISPATCHER), loadController.archive);
+router.post('/:id/restore', requireRole(Role.ADMIN, Role.DISPATCHER), loadController.restore);
+
+router.post('/:id/documents', upload.single('file'), validate(uploadDocumentSchema), documentController.upload);
+router.get('/:id/documents', documentController.getByLoad);
+
+export default router;
