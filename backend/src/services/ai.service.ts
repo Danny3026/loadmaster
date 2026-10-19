@@ -784,7 +784,7 @@ export class AIService {
       /^\s*Broker\s*:\s*([A-Za-z0-9&.,'()\/ -]+)$/gim,
     ]) || getFirstMatch([/(?:^|\n)\s*((?:AXLE|TQL|SOLVLOGIX|LOGISTIC DYNAMICS)[A-Za-z0-9&.,'()\/ -]*)(?:\s*\n|$)/im]) || firstBusinessName;
     loadNumber ||= getFirstMatch([/(?:Order|Load\s+Confirmation)\s*[:#\-]?\s*([A-Z0-9-]+)/i]);
-    const carrier = getFirstMatch([/Carrier\s*:\s*([A-Za-z0-9&.,'()\/ -]+)/i]);
+    const carrier = getFirstMatch([/(?:^|\n)[ \t]*Carrier[ \t]*:[ \t]*([A-Za-z0-9&.,'()\/ -]+)/i]);
     const carrierMC = getFirstMatch([/(?:Carrier\s+)?MC\s*#?\s*[:#\-]?\s*([A-Z0-9-]+)/i]);
     const brokerMC = this.extractVerifiedBrokerMc(normalized);
     const commodity = getFirstMatch([/Commodity(?:\s*\/\s*Description)?\s*:\s*([A-Za-z0-9&.,'()\/ -]+)/i, /Pick\s*Up\s*#\s+Quantity\s+Unit\s+Commodity(?:\s+Notes)?\s*\n\s*\d+\s+\d+\s+\w+\s+([^\n]+)/i, /Commodities?:[\s\S]*?\n\s*\d+\s+\d+\s+\w+\s+([^\n]+)/i]);

@@ -70,6 +70,17 @@ describe('AIService.extractRateConfirmation', () => {
     expect(result.brokerMC).toBe('123456');
   });
 
+  it('does not treat NOTES TO CARRIER as the carrier field', async () => {
+    const result = await new AIService().extractRateConfirmation(`
+      NOTES TO CARRIER:
+      Handle the freight carefully.
+      Carrier: Genuine Carrier LLC
+    `);
+
+    expect(result.carrier).toBe('Genuine Carrier LLC');
+    expect(result.carrier).not.toContain('Handle the freight carefully');
+  });
+
   it('extracts Axle-style order, box truck, compact stops, carrier pay, and instructions', async () => {
     const service = new AIService();
     const result = await service.extractRateConfirmation(`
