@@ -4,6 +4,7 @@ import { useCreateLoad } from '../../hooks/useLoads';
 import { useToast } from '../../contexts/ToastContext';
 import { FileText, Upload, X, Plus, Trash2 } from 'lucide-react';
 import { LOAD_TYPE_OPTIONS, normalizeLoadType } from '../../constants/loadTypes';
+import apiClient from '../../api/client';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 interface StopData {
@@ -308,17 +309,11 @@ const CreateLoadPage: React.FC = () => {
     body.append('file', file);
 
     try {
-      const token = localStorage.getItem('loadmaster_token');
-      const response = await fetch('/api/loads/extract-pdf', {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
-        body,
+      const response = await apiClient.post('/loads/extract-pdf', body, {
+        headers: { 'Content-Type': 'multipart/form-data' },
       });
 
-      const data = await response.json();
-      if (!response.ok) throw new Error(data?.error?.message || 'Failed to extract data');
-
-      const ext = data.data;
+      const ext = response.data.data;
 
       // Fill core form
       setFormData((prev) => ({
