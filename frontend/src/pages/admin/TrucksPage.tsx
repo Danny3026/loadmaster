@@ -28,6 +28,7 @@ const TruckIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="48" heigh
 export default function TrucksPage() {
   const [trucks, setTrucks] = useState<Truck[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   
   // Modal states
@@ -39,10 +40,13 @@ export default function TrucksPage() {
 
   const fetchTrucks = async () => {
     setLoading(true);
+    setLoadError('');
     try {
       const response = await trucksApi.getTrucks({ limit: 100, offset: 0 });
-      const data = response?.data ?? response;
-      setTrucks((Array.isArray(data) ? data : []).map((truck: any) => ({
+      if (!Array.isArray(response?.data)) {
+        throw new Error('The truck list response was invalid. Please try again.');
+      }
+      setTrucks(response.data.map((truck: any) => ({
         id: truck.id,
         truckNumber: truck.unit_number,
         make: truck.make,
@@ -51,6 +55,13 @@ export default function TrucksPage() {
         vin: truck.vin || '',
         status: truck.status === 'ACTIVE' ? 'Available' : truck.status === 'MAINTENANCE' ? 'Maintenance' : 'In Transit',
       })));
+    } catch (error: any) {
+      setLoadError(
+        error.response?.data?.error?.message
+          || error.response?.data?.message
+          || error.message
+          || 'Unable to load trucks. Please try again.'
+      );
     } finally {
       setLoading(false);
     }
@@ -130,6 +141,15 @@ export default function TrucksPage() {
         </button>
       </div>
 
+      {loadError && (
+        <div role="alert" className="mb-4 flex items-center justify-between gap-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+          <span>{loadError}</span>
+          <button type="button" onClick={() => void fetchTrucks()} className="shrink-0 font-semibold underline">
+            Retry
+          </button>
+        </div>
+      )}
+
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
         {/* Toolbar */}
         <div className="p-4 border-b border-gray-200 bg-white sm:flex sm:items-center sm:justify-between">
@@ -153,6 +173,8 @@ export default function TrucksPage() {
             <div className="inline-block animate-spin rounded-full h-8 w-8 border-4 border-gray-200 border-t-indigo-600"></div>
             <p className="mt-4 text-gray-500 font-medium">Loading fleet data...</p>
           </div>
+        ) : loadError ? (
+          <div className="p-12 text-center text-gray-500">Truck list could not be loaded.</div>
         ) : filteredTrucks.length === 0 ? (
           <div className="p-16 text-center flex flex-col items-center justify-center">
             <div className="bg-gray-50 p-4 rounded-full mb-4">

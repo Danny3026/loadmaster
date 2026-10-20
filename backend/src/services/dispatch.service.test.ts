@@ -13,6 +13,9 @@ const { state, mockDb, mockNotifyAssignedDriver } = vi.hoisted(() => {
     existingDispatchNotification: null as any,
     stopDateBounds: { start_date: null as Date | string | null, end_date: null as Date | string | null },
     availabilityDateFilters: [] as any[],
+    truckResult: { id: 'truck-a', unit_number: 'T-1' } as any,
+    truckFilters: [] as any[],
+    truckUnassignedFilterCount: 0,
     stops: [
       { stop_type: 'PICKUP', facility_name: 'Origin', city: 'Dallas', state: 'TX', appointment_date: '2026-10-20', appointment_start: '08:30:00' },
       { stop_type: 'DELIVERY', facility_name: 'Destination', city: 'Austin', state: 'TX', appointment_date: '2026-10-21', appointment_start: '14:00:00' },
@@ -29,12 +32,16 @@ const { state, mockDb, mockNotifyAssignedDriver } = vi.hoisted(() => {
         if (table === 'driver_availability' && typeof args[0] === 'string') {
           state.availabilityDateFilters.push(args);
         }
+        if (table === 'trucks') state.truckFilters.push(args);
         return builder;
       }),
       andWhere: vi.fn().mockReturnThis(),
       whereNot: vi.fn().mockReturnThis(),
       whereNotNull: vi.fn().mockReturnThis(),
-      whereNotExists: vi.fn().mockReturnThis(),
+      whereNotExists: vi.fn(() => {
+        if (table === 'trucks') state.truckUnassignedFilterCount += 1;
+        return builder;
+      }),
       orderBy: vi.fn().mockReturnThis(),
       min: vi.fn().mockReturnThis(),
       max: vi.fn().mockReturnThis(),
@@ -44,7 +51,7 @@ const { state, mockDb, mockNotifyAssignedDriver } = vi.hoisted(() => {
         if (table === 'load_assignments as la') return state.previousAssignment;
         if (table === 'load_assignments as assignments') return state.activeAssignment;
         if (table === 'drivers') return state.driver;
-        if (table === 'trucks') return { id: 'truck-a', unit_number: 'T-1' };
+        if (table === 'trucks') return state.truckResult;
         if (table === 'companies') return { name: 'Company A', dispatch_notification_template: 'Company {{company_name}}: {{load_number}} for {{driver_name}} from {{pickup_location}} {{pickup_date}} to {{delivery_location}} {{delivery_date}}; {{miles}} mi {{commodity}} {{rate}}' };
         if (table === 'brokers') return { name: 'Broker A' };
         if (table === 'notifications') return state.existingDispatchNotification;
@@ -96,6 +103,9 @@ describe('DispatchService template notifications', () => {
     state.existingDispatchNotification = null;
     state.stopDateBounds = { start_date: null, end_date: null };
     state.availabilityDateFilters = [];
+    state.truckResult = { id: 'truck-a', unit_number: 'T-1' };
+    state.truckFilters = [];
+    state.truckUnassignedFilterCount = 0;
     state.stops = [
       { stop_type: 'PICKUP', facility_name: 'Origin', city: 'Dallas', state: 'TX', appointment_date: '2026-10-20', appointment_start: '08:30:00' },
       { stop_type: 'DELIVERY', facility_name: 'Destination', city: 'Austin', state: 'TX', appointment_date: '2026-10-21', appointment_start: '14:00:00' },
@@ -126,6 +136,27 @@ describe('DispatchService template notifications', () => {
     await expect(service.assignLoad('company-a', 'load-a', 'driver-a', 'truck-a', 'admin-a', true))
       .rejects.toThrow('Load is already in transit');
 
+    expect(mockNotifyAssignedDriver).not.toHaveBeenCalled();
+  });
+
+  it('selects only an active truck for the current company that is not already assigned', async () => {
+    const service = new DispatchService();
+
+    await service.assignLoad('company-a', 'load-a', 'driver-a', undefined, 'admin-a', true);
+
+    expect(state.truckFilters).toContainEqual([{ company_id: 'company-a', status: 'ACTIVE' }]);
+    expect(state.truckUnassignedFilterCount).toBe(1);
+  });
+
+  it('reports missing eligible trucks instead of assigning a different truck', async () => {
+    state.truckResult = null;
+    const service = new DispatchService();
+
+    await expect(service.assignLoad('company-a', 'load-a', 'driver-a', undefined, 'admin-a', true))
+      .rejects.toThrow('Truck not found');
+
+    expect(state.truckFilters).toContainEqual([{ company_id: 'company-a', status: 'ACTIVE' }]);
+    expect(state.truckUnassignedFilterCount).toBe(1);
     expect(mockNotifyAssignedDriver).not.toHaveBeenCalled();
   });
 
