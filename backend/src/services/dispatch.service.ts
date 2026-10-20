@@ -8,6 +8,16 @@ import {
   renderDispatchNotificationTemplate,
 } from './dispatch-notification-template';
 
+const formatDateOnly = (value: Date | string): string => {
+  if (!(value instanceof Date)) return value.slice(0, 10);
+  if (Number.isNaN(value.getTime())) throw new Error('Invalid date returned from database');
+
+  const year = String(value.getFullYear()).padStart(4, '0');
+  const month = String(value.getMonth() + 1).padStart(2, '0');
+  const day = String(value.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
 export class DispatchService {
   private readonly VALID_TRANSITIONS: Record<string, string[]> = {
     pending: ['dispatched'],
@@ -18,7 +28,7 @@ export class DispatchService {
 
   private formatStopDate(stop: any): string {
     if (!stop?.appointment_date) return '';
-    const date = new Date(`${String(stop.appointment_date).slice(0, 10)}T00:00:00`);
+    const date = new Date(`${formatDateOnly(stop.appointment_date)}T00:00:00`);
     const dateText = Number.isNaN(date.getTime()) ? '' : date.toLocaleDateString('en-US');
     const time = stop.appointment_start ? String(stop.appointment_start).slice(0, 5) : '';
     return [dateText, time].filter(Boolean).join(' ');
@@ -130,8 +140,8 @@ export class DispatchService {
         .min({ start_date: 'appointment_date' })
         .max({ end_date: 'appointment_date' })
         .first();
-      const loadStart = stopDates?.start_date ? String(stopDates.start_date).slice(0, 10) : null;
-      const loadEnd = stopDates?.end_date ? String(stopDates.end_date).slice(0, 10) : null;
+      const loadStart = stopDates?.start_date ? formatDateOnly(stopDates.start_date) : null;
+      const loadEnd = stopDates?.end_date ? formatDateOnly(stopDates.end_date) : null;
       if (loadStart && loadEnd) {
         const unavailable = await trx('driver_availability')
           .where({ company_id: companyId, driver_id: driverId, status: 'UNAVAILABLE' })
@@ -139,15 +149,15 @@ export class DispatchService {
           .where('end_date', '>=', loadStart)
           .orderBy('start_date', 'asc');
         const conflictingPeriods = unavailable.filter((period: any) => dateRangesOverlap(
-          String(period.start_date).slice(0, 10),
-          String(period.end_date).slice(0, 10),
+          formatDateOnly(period.start_date),
+          formatDateOnly(period.end_date),
           loadStart,
           loadEnd
         ));
         if (conflictingPeriods.length && !overrideAvailabilityConflict) {
           const periods = conflictingPeriods.map((period: any) => ({
-            start_date: String(period.start_date).slice(0, 10),
-            end_date: String(period.end_date).slice(0, 10),
+            start_date: formatDateOnly(period.start_date),
+            end_date: formatDateOnly(period.end_date),
             reason: period.reason || null,
           }));
           throw new ConflictError(

@@ -11,6 +11,8 @@ const { state, mockDb, mockNotifyAssignedDriver } = vi.hoisted(() => {
     previousAssignment: null as any,
     activeAssignment: { assignment_id: 'assignment-existing', driver_id: 'driver-a', user_id: 'driver-user-a', first_name: 'Driver', last_name: 'A' } as any,
     existingDispatchNotification: null as any,
+    stopDateBounds: { start_date: null as Date | string | null, end_date: null as Date | string | null },
+    availabilityDateFilters: [] as any[],
     stops: [
       { stop_type: 'PICKUP', facility_name: 'Origin', city: 'Dallas', state: 'TX', appointment_date: '2026-10-20', appointment_start: '08:30:00' },
       { stop_type: 'DELIVERY', facility_name: 'Destination', city: 'Austin', state: 'TX', appointment_date: '2026-10-21', appointment_start: '14:00:00' },
@@ -23,7 +25,12 @@ const { state, mockDb, mockNotifyAssignedDriver } = vi.hoisted(() => {
       join: vi.fn().mockReturnThis(),
       leftJoin: vi.fn().mockReturnThis(),
       select: vi.fn().mockReturnThis(),
-      where: vi.fn().mockReturnThis(),
+      where: vi.fn((...args: any[]) => {
+        if (table === 'driver_availability' && typeof args[0] === 'string') {
+          state.availabilityDateFilters.push(args);
+        }
+        return builder;
+      }),
       andWhere: vi.fn().mockReturnThis(),
       whereNot: vi.fn().mockReturnThis(),
       whereNotNull: vi.fn().mockReturnThis(),
@@ -42,7 +49,7 @@ const { state, mockDb, mockNotifyAssignedDriver } = vi.hoisted(() => {
         if (table === 'brokers') return { name: 'Broker A' };
         if (table === 'notifications') return state.existingDispatchNotification;
         if (table === 'users') return { role: 'ADMIN' };
-        if (table === 'load_stops') return { start_date: null, end_date: null };
+        if (table === 'load_stops') return state.stopDateBounds;
         return null;
       }),
       insert: vi.fn().mockReturnThis(),
@@ -87,6 +94,8 @@ describe('DispatchService template notifications', () => {
     state.previousAssignment = null;
     state.activeAssignment = { assignment_id: 'assignment-existing', driver_id: 'driver-a', user_id: 'driver-user-a', first_name: 'Driver', last_name: 'A' };
     state.existingDispatchNotification = null;
+    state.stopDateBounds = { start_date: null, end_date: null };
+    state.availabilityDateFilters = [];
     state.stops = [
       { stop_type: 'PICKUP', facility_name: 'Origin', city: 'Dallas', state: 'TX', appointment_date: '2026-10-20', appointment_start: '08:30:00' },
       { stop_type: 'DELIVERY', facility_name: 'Destination', city: 'Austin', state: 'TX', appointment_date: '2026-10-21', appointment_start: '14:00:00' },
@@ -118,6 +127,37 @@ describe('DispatchService template notifications', () => {
       .rejects.toThrow('Load is already in transit');
 
     expect(mockNotifyAssignedDriver).not.toHaveBeenCalled();
+  });
+
+  it('passes ISO dates to availability queries when PostgreSQL returns Date objects', async () => {
+    state.stopDateBounds = {
+      start_date: new Date(2026, 7, 13),
+      end_date: new Date(2026, 7, 14),
+    };
+    state.stops = [
+      { stop_type: 'PICKUP', facility_name: 'Origin', city: 'Dallas', state: 'TX', appointment_date: new Date(2026, 9, 20), appointment_start: '08:30:00' },
+      { stop_type: 'DELIVERY', facility_name: 'Destination', city: 'Austin', state: 'TX', appointment_date: new Date(2026, 9, 21), appointment_start: '14:00:00' },
+    ];
+    expect(String(state.stopDateBounds.start_date).slice(0, 10)).toBe('Thu Aug 13');
+
+    const service = new DispatchService();
+    await service.assignLoad('company-a', 'load-a', 'driver-a', 'truck-a', 'admin-a', true);
+
+    expect(state.availabilityDateFilters).toContainEqual(['start_date', '<=', '2026-08-14']);
+    expect(state.availabilityDateFilters).toContainEqual(['end_date', '>=', '2026-08-13']);
+    expect(mockNotifyAssignedDriver).toHaveBeenCalledWith('company-a', 'driver-a', expect.objectContaining({
+      message: expect.stringContaining('10/20/2026 08:30 to Destination, Austin, TX 10/21/2026 14:00'),
+    }), expect.anything());
+  });
+
+  it('preserves ISO date strings in availability queries', async () => {
+    state.stopDateBounds = { start_date: '2026-10-20', end_date: '2026-10-21' };
+
+    const service = new DispatchService();
+    await service.assignLoad('company-a', 'load-a', 'driver-a', 'truck-a', 'admin-a', true);
+
+    expect(state.availabilityDateFilters).toContainEqual(['start_date', '<=', '2026-10-21']);
+    expect(state.availabilityDateFilters).toContainEqual(['end_date', '>=', '2026-10-20']);
   });
 
   it('notifies the new driver with the template and the previous driver about reassignment', async () => {
