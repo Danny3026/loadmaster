@@ -48,11 +48,11 @@ export class DriverService {
     if (data.truck_id !== undefined && data.truck_id !== null && data.truck_id !== '') {
       const truckValue = String(data.truck_id).trim();
       if (!this.isUuid(truckValue)) {
-        const trucksQuery = companyId && typeof (db as any) === 'function' ? (db as any)('trucks') : null;
-        const truck = trucksQuery && typeof trucksQuery.where === 'function'
-          ? await trucksQuery.where({ company_id: companyId, unit_number: truckValue }).first('id')
-          : null;
-        data.truck_id = truck ? truck.id : null;
+        const truck = await db('trucks')
+          .where({ company_id: companyId, unit_number: truckValue })
+          .first('id');
+        if (!truck) throw new ValidationError('The selected truck was not found in this company');
+        data.truck_id = truck.id;
       }
     }
 

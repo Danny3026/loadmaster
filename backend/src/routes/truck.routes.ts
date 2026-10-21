@@ -14,6 +14,7 @@ router.use(requireAuth, requireTenant);
 router.get('/', requireRole(Role.ADMIN, Role.DISPATCHER), truckController.getAll);
 router.get('/:id', requireRole(Role.ADMIN, Role.DISPATCHER), truckController.getById);
 router.post('/', requireRole(Role.ADMIN, Role.DISPATCHER), validate(createTruckSchema), truckController.create);
+router.put('/:id', requireRole(Role.ADMIN, Role.DISPATCHER), validate(updateTruckSchema), truckController.update);
 router.patch('/:id', requireRole(Role.ADMIN, Role.DISPATCHER), validate(updateTruckSchema), truckController.update);
 router.delete('/:id', requireRole(Role.ADMIN), truckController.deleteTruck);
 

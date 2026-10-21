@@ -11,7 +11,7 @@ import db from './config/database';
 const app = express();
 
 app.use(helmet());
-app.use(cors({ origin: env.CORS_ORIGIN }));
+app.use(cors({ origin: new URL(env.CORS_ORIGIN).origin }));
 app.use(morgan(env.LOG_LEVEL === 'info' ? 'combined' : 'dev'));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));

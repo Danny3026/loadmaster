@@ -14,7 +14,7 @@ export const trucksApi = {
     return response.data;
   },
   updateTruck: async (id: string, data: any) => {
-    const response = await apiClient.put(`/trucks/${id}`, data);
+    const response = await apiClient.patch(`/trucks/${id}`, data);
     return response.data;
   },
   deleteTruck: async (id: string) => {

@@ -27,7 +27,8 @@ interface SidebarProps {
 const navItems = [
   { name: 'Dashboard', to: '/dashboard', icon: LayoutDashboard },
   { name: 'Loads', to: '/loads', icon: Package },
-  { name: 'Drivers', to: '/drivers', icon: TruckIcon },
+  { name: 'Drivers', to: '/drivers', icon: Users },
+  { name: 'Trucks', to: '/trucks', icon: TruckIcon },
   { name: 'Team', to: '/team', icon: Users },
   { name: 'Billing', to: '/billing', icon: Receipt },
   { name: 'Settlements', to: '/settlements', icon: Landmark },

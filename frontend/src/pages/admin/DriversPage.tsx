@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { driversApi } from '../../api/drivers';
+import { trucksApi } from '../../api/trucks';
+import { DriverTruckOption, DriverTruckSelector } from '../../components/drivers/DriverTruckSelector';
 import { US_STATES } from '../../constants/usStates';
 import { CalendarDays, ChevronLeft, ChevronRight, Loader2, Upload } from 'lucide-react';
 
@@ -229,7 +231,10 @@ function avatarColor(id: string) {
 // --- Main Component ---
 export default function DriversPage() {
   const [drivers, setDrivers] = useState<Driver[]>([]);
+  const [trucks, setTrucks] = useState<DriverTruckOption[]>([]);
   const [loading, setLoading] = useState(true);
+  const [trucksLoading, setTrucksLoading] = useState(true);
+  const [trucksError, setTrucksError] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
@@ -297,6 +302,26 @@ export default function DriversPage() {
   useEffect(() => {
     fetchDrivers();
   }, [fetchDrivers]);
+
+  const fetchTrucks = useCallback(async () => {
+    setTrucksLoading(true);
+    setTrucksError('');
+    try {
+      const response = await trucksApi.getTrucks({ limit: 100, offset: 0 });
+      if (!Array.isArray(response?.data)) {
+        throw new Error('The company truck list response was invalid.');
+      }
+      setTrucks(response.data);
+    } catch (err: any) {
+      setTrucksError(err?.response?.data?.error?.message || err?.message || 'Unable to load company trucks.');
+    } finally {
+      setTrucksLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void fetchTrucks();
+  }, [fetchTrucks]);
 
   const timelineEnd = shiftDateOnly(timelineStart, 13);
   const timelineDays = Array.from({ length: 14 }, (_, index) => shiftDateOnly(timelineStart, index));
@@ -551,8 +576,7 @@ export default function DriversPage() {
     if (formData.phone.trim()) payload.phone = formData.phone.trim();
     if (formData.email.trim()) payload.email = formData.email.trim();
     if (formData.notes.trim()) payload.notes = formData.notes.trim();
-    const truckId = formData.truck_id.trim();
-    payload.truck_id = truckId && /^[0-9a-fA-F-]{36}$/.test(truckId) ? truckId : null;
+    payload.truck_id = formData.truck_id || null;
     payload.trailer_number = formData.trailer_number.trim() || null;
     payload.current_city = formData.current_city.trim() || null;
     payload.current_state = formData.current_state.trim() || null;
@@ -1144,8 +1168,14 @@ export default function DriversPage() {
 
                 <div id="equipment-location" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px', scrollMarginTop: '18px' }}>
                   <div>
-                    <label style={labelStyle}>Truck #</label>
-                    <input value={formData.truck_id} onChange={e => setFormData(p => ({ ...p, truck_id: e.target.value }))} style={inputStyle} placeholder="Existing truck ID" />
+                    <DriverTruckSelector
+                      value={formData.truck_id}
+                      trucks={trucks}
+                      loading={trucksLoading}
+                      error={trucksError}
+                      onChange={(truckId) => setFormData((previous) => ({ ...previous, truck_id: truckId }))}
+                      onRetry={() => void fetchTrucks()}
+                    />
                   </div>
                   <div>
                     <label style={labelStyle}>Trailer #</label>

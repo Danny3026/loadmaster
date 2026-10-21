@@ -2,11 +2,11 @@
   "name": "loadmaster-backend",
   "version": "1.0.0",
   "description": "LoadMaster Load Management System Backend",
-  "main": "dist/server.js",
+  "main": "dist/src/server.js",
   "scripts": {
     "dev": "tsx watch src/server.ts",
     "build": "tsc",
-    "start": "node dist/server.js",
+    "start": "node dist/src/server.js",
     "migrate": "knex --knexfile knexfile.ts migrate:latest",
     "seed": "knex --knexfile knexfile.ts seed:run",
     "diagnose": "tsx diagnose-db.ts",

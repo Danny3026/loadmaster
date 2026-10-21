@@ -28,6 +28,15 @@ export class TruckRepository {
       .first();
   }
 
+  async findInUseIds(companyId: string): Promise<string[]> {
+    return db('load_assignments as la')
+      .join('loads as l', 'l.id', 'la.load_id')
+      .where({ 'l.company_id': companyId, 'la.is_active': true })
+      .whereNotNull('la.truck_id')
+      .distinct('la.truck_id')
+      .pluck('la.truck_id');
+  }
+
   async create(companyId: string, data: any) {
     const [truck] = await db('trucks')
       .insert({ ...data, company_id: companyId })

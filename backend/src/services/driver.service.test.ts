@@ -71,6 +71,63 @@ describe('DriverService.create', () => {
       mailing_zip: '75001',
     }));
     expect(dbMock).toHaveBeenCalledWith('trucks');
+    expect(truckLookup.where).toHaveBeenCalledWith({ company_id: 'company-1', unit_number: 'TRK-101' });
+  });
+
+  it('rejects a truck unit number that does not belong to the driver company', async () => {
+    const service = new DriverService();
+    const createSpy = vi.mocked(driverRepository.create);
+    const truckLookup = {
+      where: vi.fn().mockReturnThis(),
+      first: vi.fn().mockResolvedValue(null),
+    };
+    vi.mocked(db as any).mockReturnValueOnce(truckLookup as any);
+
+    await expect(service.create('company-1', {
+      first_name: 'Jordan',
+      last_name: 'Taylor',
+      license_number: 'CDL-98765',
+      email: 'jordan@example.com',
+      truck_id: 'UNIT-OUTSIDE-COMPANY',
+    })).rejects.toThrow('The selected truck was not found in this company');
+
+    expect(truckLookup.where).toHaveBeenCalledWith({
+      company_id: 'company-1',
+      unit_number: 'UNIT-OUTSIDE-COMPANY',
+    });
+    expect(createSpy).not.toHaveBeenCalled();
+  });
+
+  it('rejects a truck UUID that does not belong to the driver company', async () => {
+    const service = new DriverService();
+    const truckLookup = {
+      where: vi.fn().mockReturnThis(),
+      first: vi.fn().mockResolvedValue(null),
+    };
+    const roleLookup = {
+      where: vi.fn().mockReturnThis(),
+      first: vi.fn().mockResolvedValue({ id: 'driver-role' }),
+    };
+    const trx = (table: string) => {
+      if (table === 'roles') return roleLookup;
+      if (table === 'trucks') return truckLookup;
+      throw new Error(`Unexpected table ${table}`);
+    };
+    (db as any).transaction = vi.fn(async (callback: (transaction: typeof trx) => unknown) => callback(trx));
+
+    await expect(service.create('company-1', {
+      first_name: 'Jordan',
+      last_name: 'Taylor',
+      license_number: 'CDL-98765',
+      email: 'jordan@example.com',
+      truck_id: '11111111-1111-4111-8111-111111111111',
+    })).rejects.toThrow('The selected truck does not belong to this company');
+
+    expect(truckLookup.where).toHaveBeenCalledWith({
+      id: '11111111-1111-4111-8111-111111111111',
+      company_id: 'company-1',
+    });
+    expect(driverRepository.create).not.toHaveBeenCalled();
   });
 
   it('rejects driver creation without a company context', async () => {

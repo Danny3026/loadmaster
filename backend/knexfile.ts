@@ -1,23 +1,20 @@
 import type { Knex } from 'knex';
 import dotenv from 'dotenv';
 import path from 'path';
-import { fileURLToPath } from 'url';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-dotenv.config({ path: path.resolve(__dirname, '.env') });
+const backendRoot = path.basename(__dirname) === 'dist' ? path.dirname(__dirname) : __dirname;
+dotenv.config({ path: path.resolve(backendRoot, '.env') });
 
 const config: { [key: string]: Knex.Config } = {
   development: {
     client: 'pg',
     connection: process.env.DATABASE_URL,
     migrations: {
-      directory: './src/database/migrations',
+      directory: path.resolve(backendRoot, 'src/database/migrations'),
       extension: 'ts',
     },
     seeds: {
-      directory: './src/database/seeds',
+      directory: path.resolve(backendRoot, 'src/database/seeds'),
       extension: 'ts',
     },
   },
@@ -29,11 +26,11 @@ const config: { [key: string]: Knex.Config } = {
       max: 10,
     },
     migrations: {
-      directory: './dist/src/database/migrations',
+      directory: path.resolve(backendRoot, 'dist/src/database/migrations'),
       extension: 'js',
     },
     seeds: {
-      directory: './dist/database/seeds',
+      directory: path.resolve(backendRoot, 'dist/src/database/seeds'),
       extension: 'js',
     },
   },

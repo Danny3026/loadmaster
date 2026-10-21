@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { trucksApi } from '../../api/trucks';
+import { useToast } from '../../contexts/ToastContext';
 
-// --- Mock Data & Types ---
 interface Truck {
   id: string;
   truckNumber: string;
@@ -9,14 +9,9 @@ interface Truck {
   model: string;
   year: number;
   vin: string;
-  status: 'Available' | 'In Transit' | 'Maintenance';
+  type: 'DRY_VAN' | 'FLATBED' | 'REEFER' | 'STEP_DECK' | 'OTHER';
+  status: 'Available' | 'Inactive' | 'Maintenance';
 }
-
-const mockTrucks: Truck[] = [
-  { id: '1', truckNumber: 'TRK-001', make: 'Freightliner', model: 'Cascadia', year: 2023, vin: '1FUJGFDF3N', status: 'Available' },
-  { id: '2', truckNumber: 'TRK-002', make: 'Volvo', model: 'VNL 860', year: 2022, vin: '4V4NC9EJ2M', status: 'In Transit' },
-  { id: '3', truckNumber: 'TRK-003', make: 'Peterbilt', model: '579', year: 2021, vin: '1XP5D49X5P', status: 'Maintenance' },
-];
 
 // --- Icons (Inline SVGs) ---
 const PlusIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>;
@@ -29,7 +24,10 @@ export default function TrucksPage() {
   const [trucks, setTrucks] = useState<Truck[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [formError, setFormError] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
+  const { showSuccess, showError } = useToast();
   
   // Modal states
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -46,15 +44,19 @@ export default function TrucksPage() {
       if (!Array.isArray(response?.data)) {
         throw new Error('The truck list response was invalid. Please try again.');
       }
-      setTrucks(response.data.map((truck: any) => ({
+      const records: any[] = response.data;
+      const mappedTrucks: Truck[] = records.map((truck): Truck => ({
         id: truck.id,
         truckNumber: truck.unit_number,
         make: truck.make,
         model: truck.model,
         year: truck.year,
         vin: truck.vin || '',
-        status: truck.status === 'ACTIVE' ? 'Available' : truck.status === 'MAINTENANCE' ? 'Maintenance' : 'In Transit',
-      })));
+        type: truck.type,
+        status: truck.status === 'ACTIVE' ? 'Available' : truck.status === 'MAINTENANCE' ? 'Maintenance' : 'Inactive',
+      }));
+      setTrucks(mappedTrucks);
+      return mappedTrucks;
     } catch (error: any) {
       setLoadError(
         error.response?.data?.error?.message
@@ -62,6 +64,7 @@ export default function TrucksPage() {
           || error.message
           || 'Unable to load trucks. Please try again.'
       );
+      return null;
     } finally {
       setLoading(false);
     }
@@ -70,6 +73,7 @@ export default function TrucksPage() {
   useEffect(() => { void fetchTrucks(); }, []);
 
   const handleOpenModal = (truck?: Truck) => {
+    setFormError('');
     if (truck) {
       setEditingTruck(truck);
       setFormData(truck);
@@ -88,25 +92,55 @@ export default function TrucksPage() {
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
+    setSaving(true);
+    setFormError('');
     const payload = {
       unit_number: formData.truckNumber,
       make: formData.make,
       model: formData.model,
       year: formData.year,
-      vin: formData.vin,
-      type: 'DRY_VAN',
+      vin: formData.vin || null,
+      type: formData.type || 'DRY_VAN',
       status: formData.status === 'Available' ? 'ACTIVE' : formData.status === 'Maintenance' ? 'MAINTENANCE' : 'INACTIVE',
     };
-    if (editingTruck) await trucksApi.updateTruck(editingTruck.id, payload);
-    else await trucksApi.createTruck(payload);
-    handleCloseModal();
-    await fetchTrucks();
+    try {
+      const response = editingTruck
+        ? await trucksApi.updateTruck(editingTruck.id, payload)
+        : await trucksApi.createTruck(payload);
+      const savedTruck = response?.data;
+      if (!savedTruck?.id) {
+        throw new Error('The server did not confirm that the truck was saved.');
+      }
+      handleCloseModal();
+      const refreshedTrucks = await fetchTrucks();
+      if (!refreshedTrucks) {
+        showError('Truck saved, but the list could not be refreshed. Use Retry to reload it.');
+      } else if (!refreshedTrucks.some((truck) => truck.id === savedTruck.id)) {
+        showError('Truck saved, but it was not returned in the company truck list. Refresh the list or contact support.');
+      } else {
+        showSuccess(editingTruck ? 'Truck updated successfully.' : 'Truck registered successfully.');
+      }
+    } catch (error: any) {
+      const message = error.response?.data?.error?.message
+        || error.response?.data?.message
+        || error.message
+        || 'Unable to save truck. Please try again.';
+      setFormError(message);
+      showError(message);
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleDelete = async (id: string) => {
     if (window.confirm('Are you sure you want to delete this truck?')) {
-      await trucksApi.deleteTruck(id);
-      await fetchTrucks();
+      try {
+        await trucksApi.deleteTruck(id);
+        await fetchTrucks();
+        showSuccess('Truck deleted successfully.');
+      } catch (error: any) {
+        showError(error.response?.data?.error?.message || error.message || 'Unable to delete truck.');
+      }
     }
   };
 
@@ -119,7 +153,7 @@ export default function TrucksPage() {
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'Available': return 'bg-emerald-100 text-emerald-800 border-emerald-200';
-      case 'In Transit': return 'bg-blue-100 text-blue-800 border-blue-200';
+      case 'Inactive': return 'bg-blue-100 text-blue-800 border-blue-200';
       case 'Maintenance': return 'bg-orange-100 text-orange-800 border-orange-200';
       default: return 'bg-gray-100 text-gray-800 border-gray-200';
     }
@@ -265,17 +299,28 @@ export default function TrucksPage() {
               <div className="space-y-5">
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Truck Number / ID</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Truck Number / Unit Number</label>
                     <input required type="text" value={formData.truckNumber || ''} onChange={e => setFormData({...formData, truckNumber: e.target.value})} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm font-bold" placeholder="TRK-001" />
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
                     <select required value={formData.status || 'Available'} onChange={e => setFormData({...formData, status: e.target.value as Truck['status']})} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm bg-white">
                       <option value="Available">Available</option>
-                      <option value="In Transit">In Transit</option>
+                      <option value="Inactive">Inactive</option>
                       <option value="Maintenance">Maintenance</option>
                     </select>
                   </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Truck Type</label>
+                  <select value={formData.type || 'DRY_VAN'} onChange={e => setFormData({...formData, type: e.target.value as Truck['type']})} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm bg-white">
+                    <option value="DRY_VAN">Dry Van</option>
+                    <option value="FLATBED">Flatbed</option>
+                    <option value="REEFER">Reefer</option>
+                    <option value="STEP_DECK">Step Deck</option>
+                    <option value="OTHER">Other</option>
+                  </select>
                 </div>
                 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -289,22 +334,23 @@ export default function TrucksPage() {
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Year</label>
-                    <input required type="number" min="1990" max={new Date().getFullYear() + 1} value={formData.year || ''} onChange={e => setFormData({...formData, year: parseInt(e.target.value)})} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" placeholder="2023" />
+                    <input required type="number" min="1980" max={new Date().getFullYear() + 1} value={formData.year || ''} onChange={e => setFormData({...formData, year: parseInt(e.target.value)})} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" placeholder="2023" />
                   </div>
                 </div>
                 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">VIN (Vehicle Identification Number)</label>
-                  <input required type="text" value={formData.vin || ''} onChange={e => setFormData({...formData, vin: e.target.value})} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm font-mono uppercase" placeholder="1FUJGFDF3N..." />
+                  <input type="text" value={formData.vin || ''} onChange={e => setFormData({...formData, vin: e.target.value})} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm font-mono uppercase" placeholder="1FUJGFDF3N..." />
                 </div>
               </div>
               
+              {formError && <div role="alert" className="mt-4 rounded-md bg-red-50 p-3 text-sm text-red-700">{formError}</div>}
               <div className="mt-8 flex justify-end gap-3 pt-4 border-t border-gray-100">
-                <button type="button" onClick={handleCloseModal} className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                <button type="button" onClick={handleCloseModal} disabled={saving} className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50">
                   Cancel
                 </button>
-                <button type="submit" className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 border border-transparent rounded-lg hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 shadow-sm">
-                  {editingTruck ? 'Save Changes' : 'Register Truck'}
+                <button type="submit" disabled={saving} className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 border border-transparent rounded-lg hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 shadow-sm disabled:opacity-50">
+                  {saving ? 'Saving...' : editingTruck ? 'Save Changes' : 'Register Truck'}
                 </button>
               </div>
             </form>

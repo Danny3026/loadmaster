@@ -83,11 +83,14 @@ export interface Driver {
 export interface Truck {
   id: string;
   unitNumber: string;
+  truck_number?: string;
+  plate_number?: string | null;
   make?: string;
   model?: string;
   year?: number;
   type?: string;
   status: 'ACTIVE' | 'INACTIVE' | 'MAINTENANCE';
+  availability_status?: 'available' | 'in_use' | 'maintenance' | 'inactive';
   vin?: string;
   licensePlate?: string;
   companyId?: string;

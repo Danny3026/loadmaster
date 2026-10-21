@@ -1,5 +1,5 @@
 import db from '../config/database';
-import { AppError, ConflictError } from '../utils/errors';
+import { AppError, ConflictError, NotFoundError } from '../utils/errors';
 import { v4 as uuidv4 } from 'uuid';
 import { dateRangesOverlap } from '../utils/date-range';
 import { notificationService } from './notification.service';
@@ -186,7 +186,7 @@ export class DispatchService {
         });
       }
       const truck = await truckQuery.first();
-      if (!truck) throw new AppError('Truck not found', 404);
+      if (!truck) throw new NotFoundError('No available truck is currently eligible for this company');
 
       if (truckId) {
         const truckInUse = await trx('load_assignments')

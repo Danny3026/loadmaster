@@ -153,7 +153,11 @@ describe('DispatchService template notifications', () => {
     const service = new DispatchService();
 
     await expect(service.assignLoad('company-a', 'load-a', 'driver-a', undefined, 'admin-a', true))
-      .rejects.toThrow('Truck not found');
+      .rejects.toMatchObject({
+        message: 'No available truck is currently eligible for this company',
+        statusCode: 404,
+        code: 'NOT_FOUND',
+      });
 
     expect(state.truckFilters).toContainEqual([{ company_id: 'company-a', status: 'ACTIVE' }]);
     expect(state.truckUnassignedFilterCount).toBe(1);

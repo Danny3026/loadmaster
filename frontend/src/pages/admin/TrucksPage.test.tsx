@@ -1,8 +1,14 @@
 import React, { act } from 'react';
 import { createRoot, Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { fireEvent } from '@testing-library/react';
 import TrucksPage from './TrucksPage';
 import { trucksApi } from '../../api/trucks';
+
+const { showSuccess, showError } = vi.hoisted(() => ({
+  showSuccess: vi.fn(),
+  showError: vi.fn(),
+}));
 
 vi.mock('../../api/trucks', () => ({
   trucksApi: {
@@ -14,12 +20,17 @@ vi.mock('../../api/trucks', () => ({
   },
 }));
 
+vi.mock('../../contexts/ToastContext', () => ({
+  useToast: () => ({ showSuccess, showError }),
+}));
+
 describe('TrucksPage list loading', () => {
   let container: HTMLDivElement;
   let root: Root;
 
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(trucksApi.getTrucks).mockResolvedValue({ success: true, data: [] } as any);
     (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
     container = document.createElement('div');
     document.body.appendChild(container);
@@ -70,5 +81,47 @@ describe('TrucksPage list loading', () => {
     expect(container.querySelector('[role="alert"]')).toBeNull();
     expect(container.textContent).toContain('UNIT-42');
     expect(container.textContent).not.toContain('No trucks found');
+  });
+
+  it('confirms truck creation and refreshes the list with the persisted record', async () => {
+    const savedTruck = {
+      id: 'truck-uuid',
+      unit_number: 'UNIT-42',
+      make: 'Freightliner',
+      model: 'Cascadia',
+      year: 2024,
+      vin: null,
+      type: 'DRY_VAN',
+      status: 'ACTIVE',
+    };
+    vi.mocked(trucksApi.createTruck).mockResolvedValue({ success: true, data: savedTruck } as any);
+    vi.mocked(trucksApi.getTrucks)
+      .mockResolvedValueOnce({ success: true, data: [] } as any)
+      .mockResolvedValueOnce({ success: true, data: [savedTruck] } as any);
+
+    await act(async () => root.render(<TrucksPage />));
+    const addButton = [...container.querySelectorAll('button')].find((button) => button.textContent?.includes('Add Truck'));
+    await act(async () => addButton!.click());
+
+    const inputs = [...container.querySelectorAll('form input')];
+    await act(async () => {
+      fireEvent.change(inputs[0], { target: { value: 'UNIT-42' } });
+      fireEvent.change(inputs[1], { target: { value: 'Freightliner' } });
+      fireEvent.change(inputs[2], { target: { value: 'Cascadia' } });
+      fireEvent.change(inputs[3], { target: { value: '2024' } });
+      fireEvent.change(inputs[4], { target: { value: '' } });
+    });
+    const form = container.querySelector('form')!;
+    await act(async () => fireEvent.submit(form));
+
+    expect(trucksApi.createTruck).toHaveBeenCalledWith(expect.objectContaining({
+      unit_number: 'UNIT-42',
+      type: 'DRY_VAN',
+      status: 'ACTIVE',
+    }));
+    expect(trucksApi.getTrucks).toHaveBeenCalledTimes(2);
+    expect(container.textContent).toContain('UNIT-42');
+    expect(showSuccess).toHaveBeenCalledWith('Truck registered successfully.');
+    expect(showError).not.toHaveBeenCalled();
   });
 });

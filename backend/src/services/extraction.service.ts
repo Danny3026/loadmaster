@@ -1,9 +1,10 @@
 import { createRequire } from 'module';
+import path from 'path';
 import { aiService } from './ai.service';
 import { ocrService } from './ocr.service';
 
-const require = createRequire(import.meta.url);
-const pdfParse = require('pdf-parse') as (buffer: Buffer) => Promise<{ text: string }>;
+const pdfParseRequire = createRequire(path.resolve(process.cwd(), 'package.json'));
+const pdfParse = pdfParseRequire('pdf-parse') as (buffer: Buffer) => Promise<{ text: string }>;
 
 export interface ExtractionResult {
   field_name: string;
