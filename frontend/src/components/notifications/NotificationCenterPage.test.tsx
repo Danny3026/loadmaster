@@ -35,13 +35,16 @@ describe('NotificationCenterPage back navigation', () => {
 
   it('returns drivers to their dashboard', () => {
     render(<NotificationCenterPage />);
-    fireEvent.click(screen.getByRole('button', { name: 'Back to driver page' }));
+    const backButton = screen.getByRole('button', { name: 'Back to Dashboard' });
+    expect(backButton.textContent).toContain('Back to Dashboard');
+    expect(backButton.querySelector('svg')).not.toBeNull();
+    fireEvent.click(backButton);
     expect(navigate).toHaveBeenCalledWith('/driver');
   });
 
   it('does not show the driver back button to admins', () => {
     user.role = 'ADMIN';
     render(<NotificationCenterPage />);
-    expect(screen.queryByRole('button', { name: 'Back to driver page' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Back to Dashboard' })).toBeNull();
   });
 });

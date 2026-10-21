@@ -44,10 +44,11 @@ export const NotificationCenterPage: React.FC = () => {
             <button
               type="button"
               onClick={() => navigate('/driver')}
-              aria-label="Back to driver page"
-              className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-slate-200 text-slate-600 transition-colors hover:bg-slate-50"
+              aria-label="Back to Dashboard"
+              className="inline-flex min-h-10 shrink-0 items-center justify-center gap-2 rounded-lg border border-slate-200 px-3 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2"
             >
               <ArrowLeft className="h-5 w-5" aria-hidden="true" />
+              <span>Back to Dashboard</span>
             </button>
           )}
           <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-blue-50 text-blue-700">
