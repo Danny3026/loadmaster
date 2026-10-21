@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Bell, CheckCheck } from 'lucide-react';
+import { ArrowLeft, Bell, CheckCheck } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { NotificationRecord } from '../../api/notifications';
 import { useAuth } from '../../contexts/AuthContext';
@@ -40,6 +40,16 @@ export const NotificationCenterPage: React.FC = () => {
     <div className="mx-auto max-w-5xl space-y-5">
       <header className="flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:flex-row sm:items-center sm:justify-between sm:p-6">
         <div className="flex items-center gap-3">
+          {user?.role === 'DRIVER' && (
+            <button
+              type="button"
+              onClick={() => navigate('/driver')}
+              aria-label="Back to driver page"
+              className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-slate-200 text-slate-600 transition-colors hover:bg-slate-50"
+            >
+              <ArrowLeft className="h-5 w-5" aria-hidden="true" />
+            </button>
+          )}
           <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-blue-50 text-blue-700">
             <Bell className="h-5 w-5" aria-hidden="true" />
           </span>
