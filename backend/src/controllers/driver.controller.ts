@@ -4,6 +4,7 @@ import { success, paginated } from '../utils/response';
 import { extractionService } from '../services/extraction.service';
 import documentExtractionUpload from '../middleware/documentExtractionUpload';
 import { driverAvailabilityService } from '../services/driver-availability.service';
+import { ValidationError } from '../utils/errors';
 
 export const getAll = async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -31,6 +32,44 @@ export const getMe = async (req: Request, res: Response, next: NextFunction) => 
   try {
     const driver = await driverService.getByUserId(req.tenantContext!.companyId, req.tenantContext!.userId);
     res.json(success(driver));
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const uploadMyProfilePhoto = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    if (!req.file) throw new ValidationError('Choose an image to upload');
+    const result = await driverService.uploadMyProfilePhoto(
+      req.tenantContext!.companyId,
+      req.tenantContext!.userId,
+      req.file.buffer,
+      req.file.mimetype,
+    );
+    res.json(success(result));
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const getMyProfilePhoto = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { stream, mimeType } = await driverService.getMyProfilePhoto(
+      req.tenantContext!.companyId,
+      req.tenantContext!.userId,
+    );
+    res.setHeader('Content-Type', mimeType);
+    res.setHeader('Content-Disposition', 'inline');
+    res.setHeader('Cache-Control', 'private, no-store');
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    stream.on('error', (error) => {
+      if (res.headersSent) {
+        res.destroy(error);
+        return;
+      }
+      next(error);
+    });
+    stream.pipe(res);
   } catch (err) {
     next(err);
   }

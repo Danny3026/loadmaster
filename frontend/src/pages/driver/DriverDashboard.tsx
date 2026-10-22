@@ -3,6 +3,8 @@ import { Link } from 'react-router-dom';
 import { ChevronRight, MapPin, Package, Upload, Landmark } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { useLoads } from '../../hooks/useLoads';
+import { useMyDriver } from '../../hooks/useDrivers';
+import { AssignedTruckCard } from '../../components/driver/AssignedTruckCard';
 import { useQuery } from '@tanstack/react-query';
 import { settlementsApi } from '../../api/settlements';
 
@@ -26,6 +28,7 @@ const settlementBadge = (status?: string) => {
 
 const DriverDashboard: React.FC = () => {
   const { user } = useAuth();
+  const { data: driver, isLoading: driverLoading, error: driverError } = useMyDriver();
   const { data, isLoading, error } = useLoads({ page: 1, limit: 5 });
   const loads: any[] = data?.data || [];
   const load: any = loads[0];
@@ -43,6 +46,7 @@ const DriverDashboard: React.FC = () => {
         <p className="text-blue-100 text-sm mt-1">Driver Portal</p>
       </header>
       <main className="p-4 -mt-4 relative z-10 space-y-6">
+        <AssignedTruckCard driver={driver} isLoading={driverLoading} error={driverError} />
         <section className="mb-6">
           <div className="flex items-center justify-between mb-3 px-1"><h2 className="text-lg font-bold text-gray-800">Current Load</h2>{load && <span className="text-xs font-semibold bg-green-100 text-green-700 px-2 py-1 rounded-full uppercase">Active</span>}</div>
           {isLoading ? <div className="bg-white rounded-3xl p-8 text-center text-gray-500 shadow-sm">Loading your load...</div> : error ? <div className="bg-red-50 rounded-3xl p-5 text-red-700">Unable to load your assigned loads.</div> : !load ? <div className="bg-white rounded-3xl p-8 text-center shadow-sm border border-gray-100"><Package className="mx-auto text-gray-300 mb-3" size={40} /><h3 className="font-bold text-gray-900">No Active Load</h3><p className="text-sm text-gray-500 mt-1">You currently have no load assigned.</p></div> : (

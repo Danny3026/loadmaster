@@ -79,11 +79,35 @@ export class DriverRepository {
   }
 
   async findByUserId(companyId: string | undefined, userId: string) {
-    const query = db('drivers').where({ user_id: userId });
+    const query = db('drivers')
+      .leftJoin('trucks', function () {
+        this.on('trucks.id', 'drivers.truck_id').andOn('trucks.company_id', 'drivers.company_id');
+      })
+      .select(
+        'drivers.*',
+        'trucks.id as assigned_truck_id',
+        'trucks.unit_number as truck_unit_number',
+        'trucks.license_plate as truck_license_plate',
+        'trucks.license_state as truck_license_state',
+        'trucks.make as truck_make',
+        'trucks.model as truck_model',
+        'trucks.year as truck_year',
+        'trucks.type as truck_type',
+        'trucks.status as truck_status',
+      )
+      .where({ 'drivers.user_id': userId });
 
     if (companyId) query.where('drivers.company_id', companyId);
 
     return query.first();
+  }
+
+  async updateProfilePhotoKey(companyId: string, id: string, storageKey: string) {
+    const [updated] = await db('drivers')
+      .where({ id, company_id: companyId })
+      .update({ profile_photo_key: storageKey, updated_at: db.fn.now() })
+      .returning('id');
+    return Boolean(updated);
   }
 }
 

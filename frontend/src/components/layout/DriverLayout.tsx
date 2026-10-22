@@ -3,10 +3,13 @@ import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { MapPin, Truck, User, Bell, LogOut, Landmark } from 'lucide-react';
 import { useCompany } from '@/hooks/useCompany';
 import { useAuth } from '../../hooks/useAuth';
+import { useMyDriver } from '../../hooks/useDrivers';
 import { NotificationBell } from '../notifications/NotificationBell';
+import { DriverAvatar } from '../driver/DriverAvatar';
 
 export function DriverLayout() {
   const { user, logout } = useAuth();
+  const { data: driver } = useMyDriver();
   const { data: company } = useCompany();
   const navigate = useNavigate();
 
@@ -33,6 +36,9 @@ export function DriverLayout() {
           </div>
           <div className="flex items-center gap-3">
             <NotificationBell />
+            <NavLink to="/driver/profile" aria-label="Open driver profile">
+              <DriverAvatar driver={driver} className="h-9 w-9 text-xs" />
+            </NavLink>
             <span className="text-sm font-medium text-slate-600">
               {user ? `${(user as any).firstName || (user as any).first_name || ''} ${(user as any).lastName || (user as any).last_name || ''}`.trim() || 'Driver' : 'Driver'}
             </span>

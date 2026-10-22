@@ -13,6 +13,8 @@ export const useMyDriver = () => {
   return useQuery({
     queryKey: ['driver', 'me'],
     queryFn: () => driversApi.getMe(),
+    staleTime: 0,
+    refetchOnWindowFocus: true,
   });
 };
 

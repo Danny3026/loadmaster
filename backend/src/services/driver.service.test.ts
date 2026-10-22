@@ -2,9 +2,23 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { DriverService } from './driver.service';
 import { driverRepository } from '../repositories/driver.repository';
 import db from '../config/database';
+import { getStorageService } from './storage.service';
+import { createCanvas } from '@napi-rs/canvas';
+
+const { mockStorage } = vi.hoisted(() => ({
+  mockStorage: {
+    saveBuffer: vi.fn(),
+    getFileStream: vi.fn(),
+    deleteFile: vi.fn(),
+  },
+}));
 
 vi.mock('../config/database', () => ({
   default: vi.fn(),
+}));
+
+vi.mock('./storage.service', () => ({
+  getStorageService: vi.fn(() => mockStorage),
 }));
 
 vi.mock('../repositories/driver.repository', () => ({
@@ -13,6 +27,8 @@ vi.mock('../repositories/driver.repository', () => ({
     findAll: vi.fn(),
     count: vi.fn(),
     findById: vi.fn(),
+    findByUserId: vi.fn(),
+    updateProfilePhotoKey: vi.fn(),
     update: vi.fn(),
     delete: vi.fn(),
   },
@@ -194,5 +210,143 @@ describe('DriverService.update', () => {
       status: 'ASSIGNED',
     }));
     expect(result).toMatchObject({ status: 'ASSIGNED' });
+  });
+});
+
+describe('DriverService profile photos', () => {
+  const validPng = createCanvas(1, 1).toBuffer('image/png');
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(getStorageService).mockReturnValue(mockStorage as any);
+    mockStorage.saveBuffer.mockResolvedValue(undefined);
+    mockStorage.deleteFile.mockResolvedValue(undefined);
+  });
+
+  it('stores a verified image and persists its key for the authenticated tenant driver', async () => {
+    const service = new DriverService();
+    vi.mocked(driverRepository.findByUserId).mockResolvedValue({
+      id: 'driver-a',
+      company_id: 'company-a',
+      user_id: 'user-a',
+      profile_photo_key: null,
+    } as any);
+    vi.mocked(driverRepository.updateProfilePhotoKey).mockResolvedValue(true);
+
+    await expect(service.uploadMyProfilePhoto('company-a', 'user-a', validPng, 'image/png'))
+      .resolves.toEqual({ has_profile_photo: true });
+
+    expect(driverRepository.findByUserId).toHaveBeenCalledWith('company-a', 'user-a');
+    expect(mockStorage.saveBuffer).toHaveBeenCalledWith(
+      expect.stringMatching(/^company-a\/driver-profile\/driver-a\/[0-9a-f-]+\.png$/i),
+      validPng,
+    );
+    expect(driverRepository.updateProfilePhotoKey).toHaveBeenCalledWith(
+      'company-a',
+      'driver-a',
+      expect.stringMatching(/\.png$/),
+    );
+  });
+
+  it('replaces only the current driver photo after saving the new image', async () => {
+    const service = new DriverService();
+    vi.mocked(driverRepository.findByUserId).mockResolvedValue({
+      id: 'driver-a',
+      company_id: 'company-a',
+      user_id: 'user-a',
+      profile_photo_key: 'company-a/driver-profile/driver-a/previous.png',
+    } as any);
+    vi.mocked(driverRepository.updateProfilePhotoKey).mockResolvedValue(true);
+
+    await service.uploadMyProfilePhoto('company-a', 'user-a', validPng, 'image/png');
+
+    expect(mockStorage.saveBuffer).toHaveBeenCalledOnce();
+    expect(driverRepository.updateProfilePhotoKey).toHaveBeenCalledOnce();
+    expect(mockStorage.deleteFile).toHaveBeenCalledWith('company-a/driver-profile/driver-a/previous.png');
+  });
+
+  it('rejects unsupported or falsely declared image content before storage', async () => {
+    const service = new DriverService();
+    vi.mocked(driverRepository.findByUserId).mockResolvedValue({
+      id: 'driver-a',
+      company_id: 'company-a',
+      user_id: 'user-a',
+    } as any);
+
+    await expect(service.uploadMyProfilePhoto('company-a', 'user-a', Buffer.from('not an image'), 'image/png'))
+      .rejects.toThrow('Invalid image content');
+    await expect(service.uploadMyProfilePhoto('company-a', 'user-a', validPng, 'image/gif'))
+      .rejects.toThrow('Invalid image content');
+    expect(mockStorage.saveBuffer).not.toHaveBeenCalled();
+  });
+
+  it('rejects oversized images and cannot resolve a driver outside the authenticated company', async () => {
+    const service = new DriverService();
+    vi.mocked(driverRepository.findByUserId).mockResolvedValue(null as any);
+    const oversized = Buffer.alloc(5 * 1024 * 1024 + 1, 0);
+
+    await expect(service.uploadMyProfilePhoto('company-a', 'user-a', oversized, 'image/png'))
+      .rejects.toThrow('no larger than 5 MB');
+    await expect(service.uploadMyProfilePhoto('company-a', 'user-a', validPng, 'image/png'))
+      .rejects.toThrow('Driver profile not found');
+
+    expect(driverRepository.findByUserId).toHaveBeenCalledWith('company-a', 'user-a');
+    expect(mockStorage.saveBuffer).not.toHaveBeenCalled();
+  });
+
+  it('retrieves only the authenticated driver photo and derives its media type from the saved key', async () => {
+    const service = new DriverService();
+    const stream = { on: vi.fn(), pipe: vi.fn() };
+    vi.mocked(driverRepository.findByUserId).mockResolvedValue({
+      id: 'driver-a',
+      company_id: 'company-a',
+      user_id: 'user-a',
+      profile_photo_key: 'company-a/driver-profile/driver-a/photo.webp',
+    } as any);
+    mockStorage.getFileStream.mockReturnValue(stream as any);
+
+    await expect(service.getMyProfilePhoto('company-a', 'user-a')).resolves.toEqual({
+      stream,
+      mimeType: 'image/webp',
+    });
+    expect(driverRepository.findByUserId).toHaveBeenCalledWith('company-a', 'user-a');
+    expect(mockStorage.getFileStream).toHaveBeenCalledWith('company-a/driver-profile/driver-a/photo.webp');
+  });
+
+  it('returns an explicit empty-photo result without opening storage', async () => {
+    const service = new DriverService();
+    vi.mocked(driverRepository.findByUserId).mockResolvedValue({
+      id: 'driver-a',
+      profile_photo_key: null,
+    } as any);
+
+    await expect(service.getMyProfilePhoto('company-a', 'user-a')).rejects.toThrow('Profile photo not found');
+    expect(mockStorage.getFileStream).not.toHaveBeenCalled();
+  });
+
+  it('does not return the private storage key in the driver profile response', async () => {
+    const service = new DriverService();
+    vi.mocked(driverRepository.findByUserId).mockResolvedValue({
+      id: 'driver-a',
+      profile_photo_key: 'company-a/driver-profile/driver-a/photo.png',
+    } as any);
+
+    const profile = await service.getByUserId('company-a', 'user-a');
+
+    expect(profile).toMatchObject({ id: 'driver-a', has_profile_photo: true });
+    expect(profile).not.toHaveProperty('profile_photo_key');
+  });
+
+  it('marks a driver without a saved photo for the fallback avatar', async () => {
+    const service = new DriverService();
+    vi.mocked(driverRepository.findByUserId).mockResolvedValue({
+      id: 'driver-a',
+      profile_photo_key: null,
+    } as any);
+
+    await expect(service.getByUserId('company-a', 'user-a')).resolves.toMatchObject({
+      id: 'driver-a',
+      has_profile_photo: false,
+    });
   });
 });

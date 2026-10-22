@@ -2,7 +2,10 @@ import { driverRepository } from '../repositories/driver.repository';
 import { NotFoundError, ValidationError } from '../utils/errors';
 import db from '../config/database';
 import * as argon2 from 'argon2';
-import { randomBytes } from 'crypto';
+import { randomBytes, randomUUID } from 'crypto';
+import path from 'path';
+import { getStorageService } from './storage.service';
+import { profilePhotoMimeType, validateProfilePhoto } from '../utils/profile-photo';
 
 export class DriverService {
   private normalizeDriverData(data: any = {}) {
@@ -16,19 +19,83 @@ export class DriverService {
   async getAll(companyId: string, pagination: any) {
     const data = await driverRepository.findAll(companyId, pagination);
     const total = await driverRepository.count(companyId);
-    return { data, total };
+    return { data: data.map((driver: { profile_photo_key?: string | null }) => this.withoutProfilePhotoKey(driver)), total };
   }
 
   async getById(companyId: string, id: string) {
     const driver = await driverRepository.findById(companyId, id);
     if (!driver) throw new NotFoundError('Driver not found');
-    return { ...driver, compensation_rates: await db('driver_compensation_rates').where({ driver_id: id }).orderBy('load_type') };
+    return this.withoutProfilePhotoKey({
+      ...driver,
+      compensation_rates: await db('driver_compensation_rates').where({ driver_id: id }).orderBy('load_type'),
+    });
+  }
+
+  private withoutProfilePhotoKey<T extends { profile_photo_key?: string | null }>(driver: T) {
+    const { profile_photo_key, ...publicProfile } = driver;
+    return { ...publicProfile, has_profile_photo: Boolean(profile_photo_key) };
   }
 
   async getByUserId(companyId: string, userId: string) {
     const driver = await driverRepository.findByUserId(companyId, userId);
     if (!driver) throw new NotFoundError('Driver profile not found');
-    return driver;
+    return this.withoutProfilePhotoKey(driver);
+  }
+
+  async uploadMyProfilePhoto(companyId: string, userId: string, buffer: Buffer, declaredMimeType: string) {
+    const { extension } = await validateProfilePhoto(buffer, declaredMimeType);
+    const driver = await driverRepository.findByUserId(companyId, userId);
+    if (!driver) throw new NotFoundError('Driver profile not found');
+
+    const storageKey = path.posix.join(companyId, 'driver-profile', driver.id, `${randomUUID()}.${extension}`);
+    const storage = getStorageService();
+    await storage.saveBuffer(storageKey, buffer);
+
+    try {
+      const updated = await driverRepository.updateProfilePhotoKey(companyId, driver.id, storageKey);
+      if (!updated) throw new NotFoundError('Driver profile not found');
+    } catch (error) {
+      try {
+        await storage.deleteFile(storageKey);
+      } catch {
+        console.error('Unable to clean up an unreferenced driver profile photo');
+      }
+      throw error;
+    }
+
+    if (driver.profile_photo_key) {
+      try {
+        const ownPhotoPrefix = `${path.posix.join(companyId, 'driver-profile', driver.id)}/`;
+        if (driver.profile_photo_key.startsWith(ownPhotoPrefix)) {
+          await storage.deleteFile(driver.profile_photo_key);
+        }
+      } catch {
+        console.error('Unable to remove a replaced driver profile photo');
+      }
+    }
+
+    return { has_profile_photo: true };
+  }
+
+  async getMyProfilePhoto(companyId: string, userId: string) {
+    const driver = await driverRepository.findByUserId(companyId, userId);
+    if (!driver) throw new NotFoundError('Driver profile not found');
+    if (!driver.profile_photo_key) throw new NotFoundError('Profile photo not found');
+    const ownPhotoPrefix = `${path.posix.join(companyId, 'driver-profile', driver.id)}/`;
+    if (!driver.profile_photo_key.startsWith(ownPhotoPrefix)) throw new NotFoundError('Profile photo not found');
+
+    try {
+      const mimeType = profilePhotoMimeType(driver.profile_photo_key);
+      return {
+        stream: getStorageService().getFileStream(driver.profile_photo_key),
+        mimeType,
+      };
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT' || (error as Error).message === 'File not found in storage') {
+        throw new NotFoundError('Profile photo not found');
+      }
+      throw error;
+    }
   }
 
   async create(companyId: string | undefined, data: any) {
@@ -66,7 +133,7 @@ export class DriverService {
     };
 
     if (typeof (db as any).transaction !== 'function') {
-      return driverRepository.create(companyId ?? null, payload);
+      return this.withoutProfilePhotoKey(await driverRepository.create(companyId ?? null, payload));
     }
 
     return db.transaction(async (trx) => {
@@ -124,7 +191,11 @@ export class DriverService {
       await this.replaceCompensationRates(trx, driver.id, compensation_rates);
       await trx('drivers').where({ id: driver.id }).update({ user_id: portalUser.id });
       return {
-        driver: { ...driver, user_id: portalUser.id, compensation_rates: await trx('driver_compensation_rates').where({ driver_id: driver.id }) },
+        driver: this.withoutProfilePhotoKey({
+          ...driver,
+          user_id: portalUser.id,
+          compensation_rates: await trx('driver_compensation_rates').where({ driver_id: driver.id }),
+        }),
         portalAccess: {
           email: portalUser.email,
           temporaryPassword,
@@ -313,7 +384,10 @@ export class DriverService {
       if (compensation_rates !== undefined) {
         await this.replaceCompensationRates(trx, id, compensation_rates);
       }
-      return { ...driver, compensation_rates: await trx('driver_compensation_rates').where({ driver_id: id }) };
+      return this.withoutProfilePhotoKey({
+        ...driver,
+        compensation_rates: await trx('driver_compensation_rates').where({ driver_id: id }),
+      });
     });
   }
 

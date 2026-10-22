@@ -3,7 +3,19 @@ import apiClient from './client';
 export const driversApi = {
   getMe: async () => {
     const response = await apiClient.get('/drivers/me');
-    return response.data;
+    return response.data.data;
+  },
+  getMyProfilePhoto: async () => {
+    const response = await apiClient.get('/drivers/me/profile-photo', { responseType: 'blob' });
+    return response.data as Blob;
+  },
+  uploadMyProfilePhoto: async (file: File, onUploadProgress?: (loaded: number, total?: number) => void) => {
+    const body = new FormData();
+    body.append('file', file);
+    const response = await apiClient.post('/drivers/me/profile-photo', body, {
+      onUploadProgress: (event) => onUploadProgress?.(event.loaded, event.total),
+    });
+    return response.data.data;
   },
   getDrivers: async (params?: any) => {
     const response = await apiClient.get('/drivers', { params });

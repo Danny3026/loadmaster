@@ -5,6 +5,7 @@ import { createDriverSchema, updateDriverSchema } from '../validators/driver.val
 import { requireAuth } from '../middleware/auth';
 import { requireTenant } from '../middleware/tenant';
 import { requireRole } from '../middleware/rbac';
+import { profilePhotoUpload } from '../middleware/profilePhotoUpload';
 import { Role } from '../types';
 import {
 	availabilityTimelineSchema,
@@ -19,6 +20,8 @@ router.use(requireAuth, requireTenant);
 
 router.get('/availability/timeline', requireRole(Role.ADMIN, Role.DISPATCHER), validate(availabilityTimelineSchema), driverController.getAvailabilityTimeline);
 router.get('/me', requireRole(Role.DRIVER), driverController.getMe);
+router.get('/me/profile-photo', requireRole(Role.DRIVER), driverController.getMyProfilePhoto);
+router.post('/me/profile-photo', requireRole(Role.DRIVER), profilePhotoUpload, driverController.uploadMyProfilePhoto);
 router.get('/', requireRole(Role.ADMIN, Role.DISPATCHER), driverController.getAll);
 router.get('/:id/availability', requireRole(Role.ADMIN, Role.DISPATCHER), driverController.getAvailability);
 router.post('/:id/availability', requireRole(Role.ADMIN, Role.DISPATCHER), validate(createDriverAvailabilitySchema), driverController.createAvailability);
