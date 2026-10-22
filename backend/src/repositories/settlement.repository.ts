@@ -73,7 +73,9 @@ export class SettlementRepository {
         deductions_amount: payload.deductions_amount || 0,
         net_amount: payload.net_amount || payload.driver_pay || 0,
         load_ids: JSON.stringify(payload.load_ids || []),
-        compensation_snapshot: payload.compensation_snapshot || null,
+        compensation_snapshot: payload.compensation_snapshot == null
+          ? null
+          : JSON.stringify(payload.compensation_snapshot),
         recurring_deductions_snapshot: JSON.stringify(payload.recurring_deductions_snapshot || []),
         notes: payload.notes || null,
       })
